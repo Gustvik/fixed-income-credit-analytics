@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fixed Income — Yield Curve Builder</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #171d26;
+    --panel-2: #1e2632;
+    --border: #2a3441;
+    --text: #e6edf3;
+    --muted: #8b98a8;
+    --accent: #4f9dff;
+    --zero: #4f9dff;
+    --par: #ffb454;
+    --fwd: #7ee787;
+    --df: #ff7b9c;
+    --grid: #232c38;
+    --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 18px;
+    padding: 18px 24px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 12px;
+    font-weight: 600;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: right; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); }
+  td:first-child, th:first-child { text-align: left; }
+  tbody tr:hover { background: var(--panel-2); }
+  input[type="number"] {
+    width: 78px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-size: 13px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="number"]:focus { outline: none; border-color: var(--accent); }
+  .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  select {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+  button.icon { padding: 4px 9px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1500px) { .charts { grid-template-columns: 1fr; } }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; user-select: none; }
+  .legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
+  .legend .item.off { opacity: 0.35; }
+  svg { width: 100%; height: auto; display: block; }
+  .chart-tip { fill: var(--text); font-size: 11px; }
+  .axis-label { fill: var(--muted); font-size: 10px; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .err { color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; background:var(--panel-2); border:1px solid var(--border); font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fixed Income — Yield Curve Builder</h1>
+  <span class="sub">Bootstrap a zero curve from fixed-rate coupon bonds → discount factors, par &amp; forward rates</span>
+</header>
+
+<div class="layout">
+  <!-- ============ INPUT PANEL ============ -->
+  <div class="panel">
+    <h2>Market Instruments</h2>
+    <div class="controls">
+      <div class="field">
+        <label>Coupon freq / yr</label>
+        <select id="freq">
+          <option value="1">Annual (1)</option>
+          <option value="2" selected>Semi-annual (2)</option>
+          <option value="4">Quarterly (4)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Display compounding</label>
+        <select id="comp">
+          <option value="0">Continuous</option>
+          <option value="1">Annual</option>
+          <option value="2" selected>Semi-annual</option>
+        </select>
+      </div>
+    </div>
+    <table id="bondTable">
+      <thead>
+        <tr>
+          <th>Maturity (y)</th>
+          <th>Coupon %</th>
+          <th>Price /100</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="bondBody"></tbody>
+    </table>
+    <div class="btn-row">
+      <button class="icon" id="addRow">+ Add bond</button>
+      <button class="icon" id="loadPar">Load par sample</button>
+      <button class="primary" id="build">Build curve ▸</button>
+    </div>
+    <div class="err" id="err"></div>
+    <p class="note">
+      Each bond is assumed to pay coupons on the chosen frequency grid up to maturity, with face 100.
+      The curve is bootstrapped in maturity order; a root-finder solves each instrument's zero rate,
+      interpolating linearly in zero rate across already-solved pillars.
+    </p>
+  </div>
+
+  <!-- ============ OUTPUT PANEL ============ -->
+  <div>
+    <div class="panel" style="margin-bottom:18px;">
+      <h2>Curves</h2>
+      <div class="charts">
+        <div>
+          <div class="legend" id="legendMain"></div>
+          <div id="chartMain"></div>
+        </div>
+        <div>
+          <div class="legend"><div class="item"><span class="swatch" style="background:var(--df)"></span>Discount factor</div></div>
+          <div id="chartDF"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Bootstrapped Results <span class="pill" id="compLabel"></span></h2>
+      <table id="resTable">
+        <thead>
+          <tr>
+            <th>Maturity</th>
+            <th>Zero rate %</th>
+            <th>Disc. factor</th>
+            <th>Par yield %</th>
+            <th>Fwd rate %</th>
+          </tr>
+        </thead>
+        <tbody id="resBody"></tbody>
+      </table>
+      <p class="note" id="resNote"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   Fixed Income Yield Curve Builder
+   - Forward bootstrap of a continuously-compounded zero curve from
+     fixed-rate coupon bonds.
+   - Linear-in-zero-rate interpolation; bisection root-finder per instrument.
+   ========================================================================= */
+
+const DEFAULT_BONDS = [
+  { mat: 0.5, cpn: 0.0,  px: 98.10 },
+  { mat: 1.0, cpn: 2.00, px: 99.30 },
+  { mat: 2.0, cpn: 2.75, px: 99.60 },
+  { mat: 3.0, cpn: 3.25, px: 99.90 },
+  { mat: 5.0, cpn: 3.75, px: 100.20 },
+  { mat: 7.0, cpn: 4.00, px: 100.10 },
+  { mat: 10.0, cpn: 4.25, px: 99.50 },
+];
+
+/* ---------- DOM helpers ---------- */
+const $ = id => document.getElementById(id);
+const fmt = (x, d=4) => (x===null||x===undefined||isNaN(x)) ? "—" : x.toFixed(d);
+
+/* ---------- Input table ---------- */
+function addBondRow(b = { mat: "", cpn: "", px: "" }) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="number" step="0.25" class="i-mat" value="${b.mat}"></td>
+    <td><input type="number" step="0.125" class="i-cpn" value="${b.cpn}"></td>
+    <td><input type="number" step="0.01" class="i-px" value="${b.px}"></td>
+    <td><button class="icon i-del" title="remove">✕</button></td>`;
+  tr.querySelector(".i-del").addEventListener("click", () => { tr.remove(); });
+  $("bondBody").appendChild(tr);
+}
+
+function loadDefaults() {
+  $("bondBody").innerHTML = "";
+  DEFAULT_BONDS.forEach(addBondRow);
+}
+
+function readBonds() {
+  const rows = [...$("bondBody").querySelectorAll("tr")];
+  const bonds = [];
+  for (const r of rows) {
+    const mat = parseFloat(r.querySelector(".i-mat").value);
+    const cpn = parseFloat(r.querySelector(".i-cpn").value);
+    const px  = parseFloat(r.querySelector(".i-px").value);
+    if (isNaN(mat) || isNaN(cpn) || isNaN(px)) continue;
+    if (mat <= 0 || px <= 0) throw new Error("Maturity and price must be positive.");
+    bonds.push({ mat, cpn, px });
+  }
+  if (bonds.length === 0) throw new Error("Enter at least one bond.");
+  bonds.sort((a, b) => a.mat - b.mat);
+  // de-dup maturities
+  for (let i = 1; i < bonds.length; i++)
+    if (Math.abs(bonds[i].mat - bonds[i-1].mat) < 1e-9)
+      throw new Error("Duplicate maturity: " + bonds[i].mat + "y.");
+  return bonds;
+}
+
+/* ---------- Curve math (continuous compounding internally) ---------- */
+// pillars: sorted array of {t, z}; z = continuously-compounded zero rate.
+function interpZero(pillars, t) {
+  if (pillars.length === 0) return 0;
+  if (t <= pillars[0].t) return pillars[0].z;          // flat extrapolation (short end)
+  const last = pillars[pillars.length - 1];
+  if (t >= last.t) return last.z;                       // flat extrapolation (long end)
+  for (let i = 1; i < pillars.length; i++) {
+    if (t <= pillars[i].t) {
+      const a = pillars[i-1], b = pillars[i];
+      const w = (t - a.t) / (b.t - a.t);
+      return a.z + w * (b.z - a.z);                     // linear in zero rate
+    }
+  }
+  return last.z;
+}
+const dfFromZero = (z, t) => Math.exp(-z * t);
+
+// Price a coupon bond (face 100) given a pillar set and frequency f.
+function priceBond(pillars, cpn, mat, f) {
+  const n = Math.round(mat * f);
+  const periodCpn = cpn / f;            // coupon currency per period, per 100 face
+  let p = 0;
+  for (let i = 1; i <= n; i++) {
+    const t = i / f;
+    const cf = periodCpn + (i === n ? 100 : 0);
+    p += cf * dfFromZero(interpZero(pillars, t), t);
+  }
+  return p;
+}
+
+// Bootstrap: solve each bond's terminal zero rate by bisection.
+function bootstrap(bonds, f) {
+  const pillars = [];
+  for (const b of bonds) {
+    let lo = -0.20, hi = 1.50;          // zero-rate bracket
+    const g = z => priceBond([...pillars, { t: b.mat, z }], b.cpn, b.mat, f) - b.px;
+    let glo = g(lo), ghi = g(hi);
+    if (glo * ghi > 0)
+      throw new Error(`No solution for ${b.mat}y bond — check the price.`);
+    let zmid;
+    for (let it = 0; it < 200; it++) {
+      zmid = 0.5 * (lo + hi);
+      const gm = g(zmid);
+      if (Math.abs(gm) < 1e-10) break;
+      if (glo * gm <= 0) { hi = zmid; ghi = gm; } else { lo = zmid; glo = gm; }
+    }
+    pillars.push({ t: b.mat, z: zmid });
+  }
+  return pillars;
+}
+
+// Par yield at maturity T on the frequency grid (in fraction, annualized).
+function parYield(pillars, T, f) {
+  const n = Math.round(T * f);
+  let annuity = 0, dfT = 1;
+  for (let i = 1; i <= n; i++) {
+    const t = i / f;
+    const df = dfFromZero(interpZero(pillars, t), t);
+    annuity += df;
+    if (i === n) dfT = df;
+  }
+  return f * (1 - dfT) / annuity;       // annualized par coupon rate (fraction)
+}
+
+/* ---------- Compounding conversion for display ---------- */
+// zc: continuous rate -> rate under m compoundings/yr (m=0 => continuous).
+function convertRate(zc, m) {
+  if (m === 0) return zc;
+  return m * (Math.exp(zc / m) - 1);
+}
+const COMP_LABEL = { 0: "continuous", 1: "annual", 2: "semi-annual" };
+
+/* ---------- Build & render ---------- */
+let lastResult = null;
+
+function build() {
+  $("err").textContent = "";
+  let bonds, pillars;
+  const f = parseInt($("freq").value, 10);
+  try {
+    bonds = readBonds();
+    pillars = bootstrap(bonds, f);
+  } catch (e) {
+    $("err").textContent = e.message;
+    return;
+  }
+
+  const m = parseInt($("comp").value, 10);
+  $("compLabel").textContent = COMP_LABEL[m] + " comp.";
+
+  // Per-pillar results
+  const rows = pillars.map((p, i) => {
+    const df = dfFromZero(p.z, p.t);
+    const zr = convertRate(p.z, m) * 100;
+    const par = parYield(pillars, p.t, f) * 100;
+    let fwd = null;
+    if (i > 0) {
+      const a = pillars[i-1];
+      // continuously-compounded forward over (a.t, p.t)
+      const fc = (p.z * p.t - a.z * a.t) / (p.t - a.t);
+      fwd = convertRate(fc, m) * 100;
+    }
+    return { t: p.t, zr, df, par, fwd };
+  });
+
+  // Fine grid for smooth plotting
+  const maxT = pillars[pillars.length - 1].t;
+  const N = 200;
+  const curveZero = [], curvePar = [], curveFwd = [], curveDF = [];
+  for (let k = 0; k <= N; k++) {
+    const t = (k / N) * maxT;
+    if (t === 0) continue;
+    const zc = interpZero(pillars, t);
+    curveZero.push({ x: t, y: convertRate(zc, m) * 100 });
+    curveDF.push({ x: t, y: dfFromZero(zc, t) });
+    // par on grid maturities only (need integer # of periods) — sample at grid
+    // instantaneous forward via small step
+    const dt = maxT / N * 0.5 + 1e-6;
+    const t2 = Math.min(t + dt, maxT);
+    const df1 = dfFromZero(interpZero(pillars, t), t);
+    const df2 = dfFromZero(interpZero(pillars, t2), t2);
+    const fc = (Math.log(df1) - Math.log(df2)) / (t2 - t);
+    curveFwd.push({ x: t, y: convertRate(fc, m) * 100 });
+  }
+  // Par curve sampled at frequency grid points up to maxT
+  for (let i = 1; i <= Math.round(maxT * f); i++) {
+    const t = i / f;
+    curvePar.push({ x: t, y: parYield(pillars, t, f) * 100 });
+  }
+
+  lastResult = { rows, curveZero, curvePar, curveFwd, curveDF, m };
+  renderResults(rows, m);
+  renderCharts();
+}
+
+function renderResults(rows, m) {
+  $("resBody").innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.t}y</td>
+      <td>${fmt(r.zr, 3)}</td>
+      <td>${fmt(r.df, 5)}</td>
+      <td>${fmt(r.par, 3)}</td>
+      <td>${r.fwd === null ? "—" : fmt(r.fwd, 3)}</td>
+    </tr>`).join("");
+  $("resNote").textContent =
+    `Zero, par and forward rates shown under ${COMP_LABEL[m]} compounding. ` +
+    `Forward = rate between consecutive pillar maturities. Discount factors are convention-free.`;
+}
+
+/* ---------- SVG line chart ---------- */
+const seriesOn = { zero: true, par: true, fwd: true };
+
+function lineChart(containerId, series, opts = {}) {
+  const W = opts.w || 620, H = opts.h || 320;
+  const mL = 48, mR = 16, mT = 14, mB = 34;
+  const plotW = W - mL - mR, plotH = H - mT - mB;
+  const active = series.filter(s => s.on !== false && s.data.length);
+  let xs = [], ys = [];
+  active.forEach(s => s.data.forEach(p => { xs.push(p.x); ys.push(p.y); }));
+  if (xs.length === 0) { $(containerId).innerHTML = ""; return; }
+  let xMin = 0, xMax = Math.max(...xs);
+  let yMin = Math.min(...ys), yMax = Math.max(...ys);
+  if (opts.yFrom0) yMin = Math.min(yMin, 0);
+  if (opts.yMaxOne) yMax = Math.max(yMax, 1);
+  const pad = (yMax - yMin) * 0.08 || 0.1;
+  yMin -= pad; yMax += pad;
+  const sx = x => mL + (x - xMin) / (xMax - xMin) * plotW;
+  const sy = y => mT + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  // y grid + labels
+  const yticks = 5;
+  for (let i = 0; i <= yticks; i++) {
+    const yv = yMin + (i / yticks) * (yMax - yMin);
+    const yy = sy(yv);
+    svg += `<line class="grid-line" x1="${mL}" y1="${yy}" x2="${W-mR}" y2="${yy}"/>`;
+    svg += `<text class="axis-label" x="${mL-6}" y="${yy+3}" text-anchor="end">${yv.toFixed(opts.yDec ?? 2)}</text>`;
+  }
+  // x ticks
+  const xticks = Math.min(10, Math.round(xMax));
+  for (let i = 0; i <= xticks; i++) {
+    const xv = (i / xticks) * xMax;
+    const xx = sx(xv);
+    svg += `<line class="grid-line" x1="${xx}" y1="${mT}" x2="${xx}" y2="${mT+plotH}"/>`;
+    svg += `<text class="axis-label" x="${xx}" y="${H-mB+16}" text-anchor="middle">${xv.toFixed(xv<1?1:0)}</text>`;
+  }
+  svg += `<text class="axis-label" x="${mL+plotW/2}" y="${H-2}" text-anchor="middle">Maturity (years)</text>`;
+  // series
+  active.forEach(s => {
+    const d = s.data.map((p, i) => `${i?"L":"M"}${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join(" ");
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    if (s.dots) s.data.forEach(p =>
+      svg += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="2.5" fill="${s.color}"/>`);
+  });
+  svg += `</svg>`;
+  $(containerId).innerHTML = svg;
+}
+
+function renderCharts() {
+  if (!lastResult) return;
+  const { curveZero, curvePar, curveFwd, curveDF } = lastResult;
+  lineChart("chartMain", [
+    { name: "zero", color: getCss("--zero"), data: curveZero, on: seriesOn.zero },
+    { name: "par",  color: getCss("--par"),  data: curvePar,  on: seriesOn.par, dots: true },
+    { name: "fwd",  color: getCss("--fwd"),  data: curveFwd,  on: seriesOn.fwd },
+  ], { yDec: 2 });
+  lineChart("chartDF", [
+    { name: "df", color: getCss("--df"), data: curveDF },
+  ], { yFrom0: true, yMaxOne: true, yDec: 2 });
+}
+
+function getCss(v) {
+  return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+}
+
+function buildLegend() {
+  const items = [
+    { key: "zero", label: "Zero rate", color: "--zero" },
+    { key: "par",  label: "Par yield", color: "--par" },
+    { key: "fwd",  label: "Forward rate", color: "--fwd" },
+  ];
+  $("legendMain").innerHTML = items.map(it =>
+    `<div class="item${seriesOn[it.key] ? "" : " off"}" data-key="${it.key}">
+       <span class="swatch" style="background:var(${it.color})"></span>${it.label}
+     </div>`).join("");
+  $("legendMain").querySelectorAll(".item").forEach(el =>
+    el.addEventListener("click", () => {
+      const k = el.dataset.key;
+      seriesOn[k] = !seriesOn[k];
+      el.classList.toggle("off", !seriesOn[k]);
+      renderCharts();
+    }));
+}
+
+/* ---------- Wire up ---------- */
+$("addRow").addEventListener("click", () => addBondRow());
+$("loadPar").addEventListener("click", () => { loadDefaults(); build(); });
+$("build").addEventListener("click", build);
+$("freq").addEventListener("change", build);
+$("comp").addEventListener("change", build);
+
+loadDefaults();
+buildLegend();
+build();
+</script>
+</body>
+</html>

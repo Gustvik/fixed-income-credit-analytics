@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Fixed_Income\")",
+      "Bash(py --version)"
+    ]
+  }
+}

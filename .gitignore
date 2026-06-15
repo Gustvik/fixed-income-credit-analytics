@@ -14,6 +14,9 @@ env/
 # Streamlit
 .streamlit/secrets.toml
 
+# Claude Code local settings
+.claude/
+
 # OS / editor
 .DS_Store
 Thumbs.db

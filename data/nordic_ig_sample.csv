@@ -1,0 +1,17 @@
+name,issuer,sector,country,rating,maturity,coupon,price,freq,nominal
+KBN 4.05 2028,Kommunalbanken,SSA,NO,AAA,2.0,4.05,100.20,2,120
+DNB 4.55 2029,DNB Bank,Banking,NO,AA-,3.0,4.55,100.40,2,100
+Nordea 4.50 2029,Nordea Bank,Banking,FI,AA-,3.0,4.50,100.30,2,110
+SpareBank1 SMN 4.65 2028,SpareBank 1 SMN,Banking,NO,A-,2.0,4.65,100.20,2,70
+Equinor 4.40 2031,Equinor,Energy,NO,AA-,5.0,4.40,99.80,2,90
+Telenor 4.70 2030,Telenor,Telecom,NO,A-,4.0,4.70,100.10,2,80
+Ericsson 5.35 2029,Ericsson,Telecom,SE,BBB-,3.0,5.35,99.80,2,40
+Storebrand 4.95 2031,Storebrand,Insurance,NO,A,5.0,4.95,100.00,2,60
+Sampo 4.60 2031,Sampo,Insurance,FI,A,5.0,4.60,99.40,2,50
+Yara 5.10 2030,Yara International,Materials,NO,BBB,4.0,5.10,99.60,2,70
+Norsk Hydro 5.25 2031,Norsk Hydro,Materials,NO,BBB,5.0,5.25,99.50,2,65
+Stora Enso 5.55 2030,Stora Enso,Materials,FI,BBB-,4.0,5.55,99.20,2,45
+Mowi 5.40 2029,Mowi,Consumer,NO,BBB-,3.0,5.40,99.70,2,50
+Orkla 4.80 2030,Orkla,Consumer,NO,BBB+,4.0,4.80,100.00,2,55
+Volvo Treasury 4.85 2030,Volvo Treasury,Industrials,SE,A-,4.0,4.85,99.90,2,60
+Investor AB 4.30 2032,Investor AB,Financials,SE,AA-,6.0,4.30,99.00,2,50

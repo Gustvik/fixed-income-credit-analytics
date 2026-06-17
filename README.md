@@ -1,8 +1,8 @@
-# Fixed Income — Yield Curve Builder
+# Fixed Income Toolkit
 
-Bootstrap a **zero (spot) curve from fixed-rate coupon bonds**, then derive
-**discount factors, par yields and forward rates** — as an interactive
-[Streamlit](https://streamlit.io) app.
+Rate-curve construction and an **investment-grade credit portfolio model** — credit
+treated as an *asset class* (spread as a return source and risk factor), not just
+credit risk in lending. Built as a multipage [Streamlit](https://streamlit.io) app.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
@@ -14,44 +14,67 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Then open the local URL Streamlit prints (default <http://localhost:8501>).
+Streamlit opens a multipage app:
+
+- **📈 Yield Curve** — bootstrap a zero curve from coupon bonds → discount factors,
+  par yields, forward rates. The risk-free foundation for credit spreads.
+- **📊 Credit Portfolio** — the IG credit model (below).
+
+## Credit Portfolio — what it does
+
+| Component | Method |
+|---|---|
+| **Yield & spread** | YTM, **Z-spread** (constant spread over the zero curve), G-spread |
+| **Duration** | Macaulay, modified, convexity, **spread duration**, DV01 |
+| **Spread decomposition** | yield = risk-free rate + credit premium, per bond and portfolio |
+| **Portfolio construction** | MV weights, **DTS** (duration × spread), risk budgeting |
+| **Active risk** | active duration / spread duration / DTS / yield vs. a benchmark |
+| **Scenario analysis** | exact re-pricing under parallel rate shift Δr and spread widening Δs (+ duration/convexity approximation and a Δr×Δs heatmap) |
+| **Early warning** | spread-movement z-score monitor → OK / WATCH / ALERT |
+
+The risk-free base is a bootstrapped **NOK government curve**; the universe is an
+illustrative **Nordic IG** set (NOK). Upload your own CSV to use real instruments.
+
+## Mapping to CFA Level II (Fixed Income)
+
+- *Yield & spread measures* → YTM, Z-spread, G-spread
+- *Term structure* → bootstrapped zero/forward curve (Yield Curve page)
+- *Interest-rate risk* → modified duration, convexity, DV01, key risk numbers
+- *Credit analysis* → spread decomposition, spread duration, **DTS**
+- *Portfolio management* → benchmark-relative active risk and risk budgeting
 
 ## Project layout
 
 ```
 .
-├── app.py                  # Streamlit front-end
+├── app.py                          # landing page
+├── pages/
+│   ├── 1_Yield_Curve.py            # zero-curve bootstrap UI
+│   └── 2_Credit_Portfolio.py       # IG credit model UI
 ├── fixed_income/
-│   ├── __init__.py
-│   └── curve.py            # core bootstrap / pricing math (single source of truth)
-├── tests/
-│   └── test_curve.py       # pytest: re-price round-trip + invariants
+│   ├── curve.py                    # bootstrap / discounting / par & forward rates
+│   ├── credit.py                   # YTM, spreads, durations, DTS, scenarios, alerts
+│   └── data_io.py                  # sample-data loaders + risk-free curve
+├── data/
+│   ├── norwegian_govt_sample.csv   # risk-free curve instruments
+│   └── nordic_ig_sample.csv        # illustrative IG universe
+├── tests/                          # pytest (curve + credit)
+├── index.html                      # standalone offline curve tool (no Python)
 ├── requirements.txt
-├── index.html              # standalone offline version (no Python needed)
-├── LICENSE
-└── README.md
+└── LICENSE
 ```
-
-## What it does
-
-1. **Input** — a table of fixed-rate coupon bonds: maturity (years), coupon (% of
-   face), and market price (per 100 face). Pick the coupon frequency.
-2. **Bootstrap** — instruments are sorted by maturity; a bisection root-finder
-   solves each bond's terminal zero rate so the curve re-prices it exactly. Zero
-   rates between solved pillars are interpolated linearly in the zero rate.
-3. **Output** — zero curve, discount factors `DF(t) = exp(-z·t)`, par yields
-   `f·(1 − DF(T)) / Σ DF(tᵢ)`, and forward rates, shown as charts and a table.
-   Display compounding is selectable (continuous / annual / semi-annual).
 
 ## Using the model in code
 
 ```python
-from fixed_income import Bond, bootstrap, discount_factor, par_yield
+from fixed_income import CreditBond, analyse_bond, portfolio_summary, mv_weights
+from fixed_income.data_io import load_govt_bonds, risk_free_curve
 
-bonds = [Bond(1.0, 2.0, 99.30), Bond(2.0, 2.75, 99.60), Bond(5.0, 3.75, 100.20)]
-pillars = bootstrap(bonds, freq=2)
-for p in pillars:
-    print(p.t, p.z, discount_factor(p.z, p.t))
+pillars = risk_free_curve(load_govt_bonds())
+bond = CreditBond("Equinor 4.40 2031", "Equinor", "Energy", "NO", "AA-",
+                  maturity=5.0, coupon=4.40, price=99.80, freq=2, nominal=90)
+rec = analyse_bond(bond, pillars)
+print(rec["ytm"], rec["credit_spread_bp"], rec["mod_duration"], rec["dts"])
 ```
 
 ## Tests
@@ -61,35 +84,29 @@ pip install pytest
 pytest
 ```
 
-The key test re-prices the input bonds with the bootstrapped curve and asserts the
-result matches the market prices (to ~1e-8).
+Key invariants checked: the bootstrapped curve re-prices its inputs (~1e-8); the
+Z-spread re-prices each bond; IG bonds price at positive spread to govt; scenario
+signs are correct (rates up / spreads wider → value down); weights and risk-budget
+contributions sum to 1.
 
-## Deploy on Streamlit Community Cloud
+## Methodology notes
 
-1. Push this repo to GitHub (see below).
-2. Go to <https://share.streamlit.io>, sign in with GitHub.
-3. **New app** → pick this repo, branch `main`, main file `app.py`.
-4. Deploy. Community Cloud installs `requirements.txt` automatically.
+- Discounting uses **continuously-compounded** zero rates internally; spreads are
+  reported in basis points. DTS = spread duration × spread (%).
+- Each bond pays coupons on its frequency grid up to maturity, face = 100.
+- **Sample data is illustrative.** Real Nordic IG prices require a data subscription
+  (e.g. Nordic Bond Pricing / Stamdata); the CSV uploader lets you plug those in.
 
-## Publish to GitHub
+## Deploy
+
+- **GitHub:** `git push` to a repo (see below).
+- **Streamlit Community Cloud:** <https://share.streamlit.io> → New app → this repo →
+  main file `app.py`. `requirements.txt` is installed automatically.
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit: fixed income yield-curve builder"
-gh repo create fixed-income-curve --public --source=. --push
-# or create the repo on github.com and:
-#   git remote add origin https://github.com/<you>/fixed-income-curve.git
-#   git push -u origin main
+git remote add origin https://github.com/<you>/fixed-income-toolkit.git
+git push -u origin main
 ```
-
-## Method notes
-
-- Discounting uses **continuously-compounded** zero rates internally; display
-  rates convert via `r_m = m·(exp(z_c/m) − 1)`.
-- Each bond pays coupons on the chosen frequency grid up to maturity, face = 100.
-- Linear-in-zero interpolation is robust to instruments spaced more widely than one
-  coupon period (intermediate coupon dates are interpolated).
 
 ## License
 

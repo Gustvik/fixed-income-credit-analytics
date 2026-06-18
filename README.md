@@ -4,10 +4,15 @@ Rate-curve construction and an **investment-grade credit portfolio model** — c
 treated as an *asset class* (spread as a return source and risk factor), not just
 credit risk in lending. Built as a multipage [Streamlit](https://streamlit.io) app.
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://fixed-income-credit-analytics-qpdbgcspxxgmsjd3l6qd6v.streamlit.app/)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
+**▶ Live demo:** <https://fixed-income-credit-analytics-qpdbgcspxxgmsjd3l6qd6v.streamlit.app/>
+
 ## Quick start
+
+Try it live with the link above, or run locally:
 
 ```bash
 pip install -r requirements.txt

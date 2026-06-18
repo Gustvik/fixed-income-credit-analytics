@@ -20,7 +20,9 @@ from .credit import (
     durations,
     early_warning,
     g_spread,
+    key_rate_durations,
     mv_weights,
+    portfolio_key_rate_durations,
     portfolio_scenario,
     portfolio_summary,
     reprice,
@@ -28,9 +30,11 @@ from .credit import (
     scenario_pnl,
     spread_duration,
     synthetic_spread_history,
+    tracking_error,
     ytm,
     z_spread,
 )
+from .oas import calibrate_tree, oas_analysis, value_bond
 
 __all__ = [
     # curve
@@ -52,7 +56,9 @@ __all__ = [
     "durations",
     "early_warning",
     "g_spread",
+    "key_rate_durations",
     "mv_weights",
+    "portfolio_key_rate_durations",
     "portfolio_scenario",
     "portfolio_summary",
     "reprice",
@@ -60,8 +66,13 @@ __all__ = [
     "scenario_pnl",
     "spread_duration",
     "synthetic_spread_history",
+    "tracking_error",
     "ytm",
     "z_spread",
+    # oas
+    "calibrate_tree",
+    "oas_analysis",
+    "value_bond",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

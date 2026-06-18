@@ -18,7 +18,7 @@ Spreads are handled in continuous-compounding terms and reported in basis points
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .curve import Pillar, interp_zero, convert_rate
 
@@ -257,6 +257,90 @@ def active_risk(records: list[dict], port_w: list[float], bench_w: list[float]) 
         "portfolio": port,
         "benchmark": bench,
     }
+
+
+# --------------------------------------------------------------------------- #
+# Key-rate durations (curve risk beyond a parallel shift)
+# --------------------------------------------------------------------------- #
+def key_rate_durations(pillars: list[Pillar], coupon: float, maturity: float, freq: int,
+                       z: float, bump_bp: float = 1.0, face: float = 100.0) -> list[tuple]:
+    """Sensitivity to a 1bp bump at each curve pillar (key tenor).
+
+    Because the curve interpolates linearly in the zero rate, bumping a single
+    pillar produces a triangular shock that tapers to zero at the neighbouring
+    pillars — the textbook key-rate (partial) duration. Returns ``[(tenor, krd)]``;
+    the sum approximates the bond's effective duration to the risk-free curve.
+    """
+    bump = bump_bp * 1e-4
+    base = reprice(pillars, coupon, maturity, freq, z, 0.0, 0.0, face)
+    out = []
+    for k in range(len(pillars)):
+        up = [Pillar(p.t, p.z + (bump if i == k else 0.0)) for i, p in enumerate(pillars)]
+        dn = [Pillar(p.t, p.z - (bump if i == k else 0.0)) for i, p in enumerate(pillars)]
+        p_up = reprice(up, coupon, maturity, freq, z, 0.0, 0.0, face)
+        p_dn = reprice(dn, coupon, maturity, freq, z, 0.0, 0.0, face)
+        krd = -(p_up - p_dn) / (2 * base * bump)
+        out.append((pillars[k].t, krd))
+    return out
+
+
+def portfolio_key_rate_durations(records: list[dict], weights: list[float],
+                                 pillars: list[Pillar]) -> list[tuple]:
+    """Market-value-weighted key-rate durations for the whole portfolio."""
+    tenors = [p.t for p in pillars]
+    agg = [0.0] * len(tenors)
+    for r, w in zip(records, weights):
+        krds = key_rate_durations(pillars, r["coupon"], r["maturity"], 2, r["_z"])
+        for idx, (_, krd) in enumerate(krds):
+            agg[idx] += w * krd
+    return list(zip(tenors, agg))
+
+
+# --------------------------------------------------------------------------- #
+# Ex-ante tracking error (covariance / factor model)
+# --------------------------------------------------------------------------- #
+def tracking_error(records: list[dict], port_w: list[float], bench_w: list[float],
+                   sigma_rate: float = 0.010, sigma_sys: float = 0.008,
+                   sigma_sector: float = 0.004, sigma_idio: float = 0.005,
+                   rho_rate_spread: float = -0.20) -> dict:
+    """Ex-ante tracking error from a rate + (systematic/sector/idiosyncratic) spread model.
+
+    Each bond's annual return is modelled as ``R = -D·Δy - SD·Δs``, where the rate
+    factor ``Δy`` and a hierarchical spread factor (common + sector + name-specific)
+    drive a return covariance matrix ``Σ``. TE = ``sqrt(wᵀ Σ w)`` on active weights
+    ``w = port − bench``. Also returns each position's contribution to TE (which sum
+    to TE). All vols are annualised decimals (e.g. 0.010 = 100bp/yr).
+    """
+    import numpy as np
+
+    n = len(records)
+    D = np.array([r["mod_duration"] for r in records])
+    SD = np.array([r["spread_duration"] for r in records])
+    sectors = [r["sector"] for r in records]
+
+    sigma = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            cov_spread = sigma_sys ** 2
+            if sectors[i] == sectors[j]:
+                cov_spread += sigma_sector ** 2
+            if i == j:
+                cov_spread += sigma_idio ** 2
+            cov = D[i] * D[j] * sigma_rate ** 2 + SD[i] * SD[j] * cov_spread
+            cov += (D[i] * SD[j] + SD[i] * D[j]) * rho_rate_spread * sigma_rate * sigma_sys
+            sigma[i, j] = cov
+
+    wa = np.array(port_w) - np.array(bench_w)
+    var = float(wa @ sigma @ wa)
+    te = math.sqrt(max(var, 0.0))
+    sw = sigma @ wa
+    ctr = (wa * sw / te) if te > 0 else np.zeros(n)  # contributions sum to te
+    contributions = [
+        {"name": r["name"], "sector": r["sector"], "active_weight": float(wa[i]),
+         "ctr_te": float(ctr[i]), "pct_of_te": float(ctr[i] / te) if te > 0 else 0.0}
+        for i, r in enumerate(records)
+    ]
+    return {"tracking_error": te, "contributions": contributions}
 
 
 # --------------------------------------------------------------------------- #

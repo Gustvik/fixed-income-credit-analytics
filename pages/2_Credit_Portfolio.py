@@ -12,10 +12,13 @@ from fixed_income import (
     analyse_bond,
     early_warning,
     mv_weights,
+    oas_analysis,
+    portfolio_key_rate_durations,
     portfolio_scenario,
     portfolio_summary,
     risk_budget,
     synthetic_spread_history,
+    tracking_error,
 )
 from fixed_income.data_io import load_credit_universe, load_govt_bonds, risk_free_curve
 
@@ -107,8 +110,9 @@ n = len(records)
 eq_w = [1.0 / n] * n
 bench_w = eq_w if bench_mode == "Equal weight" else mv_weights(records)
 
-tab_an, tab_pf, tab_sc, tab_ew = st.tabs(
-    ["📈 Yield & Spread", "🧮 Portfolio & Risk", "⚡ Scenarios", "🚨 Early Warning"]
+tab_an, tab_pf, tab_kr, tab_te, tab_sc, tab_oas, tab_ew = st.tabs(
+    ["📈 Yield & Spread", "🧮 Portfolio & Risk", "📐 Curve Risk", "🎯 Tracking Error",
+     "⚡ Scenarios", "📞 OAS (Callable)", "🚨 Early Warning"]
 )
 
 # --------------------------------------------------------------------------- #
@@ -242,7 +246,102 @@ with tab_pf:
         st.altair_chart(sec_chart, width="stretch")
 
 # --------------------------------------------------------------------------- #
-# TAB 3 — Scenario analysis
+# TAB 3 — Curve risk: key-rate durations
+# --------------------------------------------------------------------------- #
+with tab_kr:
+    st.markdown("#### Key-rate (partial) durations")
+    st.caption(
+        "Sensitivity to a 1bp move at each curve pillar, holding other tenors fixed. "
+        "Unlike a single modified duration, this shows *where* on the curve the risk sits "
+        "— so you can see bullet vs. barbell exposure and steepener/flattener tilts."
+    )
+    port_krd = portfolio_key_rate_durations(records, port_w, pillars)
+    bench_krd = portfolio_key_rate_durations(records, bench_w, pillars)
+    krd_df = pd.DataFrame({
+        "Tenor": [f"{t:g}y" for t, _ in port_krd],
+        "Portfolio": [k for _, k in port_krd],
+        "Benchmark": [k for _, k in bench_krd],
+    })
+    krd_df["Active"] = krd_df["Portfolio"] - krd_df["Benchmark"]
+
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        krd_long = krd_df.melt("Tenor", value_vars=["Portfolio", "Benchmark"],
+                               var_name="Book", value_name="KRD")
+        krd_chart = (
+            alt.Chart(krd_long)
+            .mark_bar()
+            .encode(
+                x=alt.X("Tenor:N", sort=list(krd_df["Tenor"]), title="Curve pillar"),
+                y=alt.Y("KRD:Q", title="Key-rate duration (yr)"),
+                color=alt.Color("Book:N", scale=alt.Scale(
+                    domain=["Portfolio", "Benchmark"], range=["#4f9dff", "#8b98a8"])),
+                xOffset="Book:N",
+                tooltip=["Tenor", "Book", alt.Tooltip("KRD:Q", format=".3f")],
+            )
+            .properties(height=360)
+        )
+        st.altair_chart(krd_chart, width="stretch")
+    with col2:
+        show_krd = krd_df.copy()
+        for c in ["Portfolio", "Benchmark", "Active"]:
+            show_krd[c] = show_krd[c].round(3)
+        st.dataframe(show_krd, width="stretch", hide_index=True)
+        st.metric("Σ KRD (≈ effective duration)", f"{krd_df['Portfolio'].sum():.2f} yr")
+
+# --------------------------------------------------------------------------- #
+# TAB 4 — Ex-ante tracking error (covariance model)
+# --------------------------------------------------------------------------- #
+with tab_te:
+    st.markdown("#### Ex-ante tracking error vs. benchmark")
+    st.caption(
+        "Covariance/factor model: each bond's return = −ModDur·Δrate − SprdDur·Δspread, "
+        "with a hierarchical spread factor (common + sector + name). "
+        "TE = √(wᵀΣw) on active weights. Tune the annualised factor vols below."
+    )
+    if bench_mode == "Market value":
+        st.info("Benchmark is set to *Market value* = the portfolio, so active weights "
+                "are zero and TE = 0. Switch the benchmark to *Equal weight* in the sidebar.")
+    c = st.columns(5)
+    sig_rate = c[0].slider("Rate vol (bp/yr)", 20, 200, 100, 10) / 1e4
+    sig_sys = c[1].slider("Systematic spread (bp/yr)", 20, 200, 80, 10) / 1e4
+    sig_sec = c[2].slider("Sector spread (bp/yr)", 0, 150, 40, 10) / 1e4
+    sig_idio = c[3].slider("Idiosyncratic (bp/yr)", 0, 200, 50, 10) / 1e4
+    rho = c[4].slider("Rate–spread corr", -0.9, 0.9, -0.2, 0.1)
+
+    te = tracking_error(records, port_w, bench_w, sig_rate, sig_sys, sig_sec, sig_idio, rho)
+    st.metric("Tracking error", f"{te['tracking_error']*100:.2f} % / yr")
+
+    ctr = pd.DataFrame(te["contributions"])
+    ctr = ctr.reindex(ctr["ctr_te"].abs().sort_values(ascending=False).index)
+    ctr_show = ctr.copy()
+    ctr_show["active_weight"] = (ctr_show["active_weight"] * 100).round(2)
+    ctr_show["ctr_te"] = (ctr_show["ctr_te"] * 100).round(3)
+    ctr_show["pct_of_te"] = (ctr_show["pct_of_te"] * 100).round(1)
+    ctr_show = ctr_show.rename(columns={
+        "name": "Bond", "sector": "Sector", "active_weight": "Active wt %",
+        "ctr_te": "Contrib to TE %", "pct_of_te": "% of TE"})
+
+    col1, col2 = st.columns([2, 3])
+    with col1:
+        st.dataframe(ctr_show, width="stretch", hide_index=True)
+    with col2:
+        ctr_chart = (
+            alt.Chart(ctr.assign(ctr_pct=ctr["ctr_te"] * 100))
+            .mark_bar()
+            .encode(
+                x=alt.X("ctr_pct:Q", title="Contribution to TE (%)"),
+                y=alt.Y("name:N", sort="-x", title=None),
+                color=alt.condition(alt.datum.ctr_pct > 0,
+                                    alt.value("#ff7b9c"), alt.value("#7ee787")),
+                tooltip=["name", alt.Tooltip("ctr_pct:Q", format=".3f")],
+            )
+            .properties(height=380)
+        )
+        st.altair_chart(ctr_chart, width="stretch")
+
+# --------------------------------------------------------------------------- #
+# TAB 5 — Scenario analysis
 # --------------------------------------------------------------------------- #
 with tab_sc:
     st.markdown("#### Single scenario")
@@ -291,7 +390,62 @@ with tab_sc:
     st.altair_chart(heat + text, width="stretch")
 
 # --------------------------------------------------------------------------- #
-# TAB 4 — Early-warning monitoring
+# TAB 6 — OAS for callable bonds
+# --------------------------------------------------------------------------- #
+with tab_oas:
+    st.markdown("#### Option-adjusted spread — callable bond calculator")
+    st.caption(
+        "Values an embedded issuer call on a binomial short-rate tree calibrated to the "
+        "risk-free curve (annual steps). The OAS strips the option out of the spread: "
+        "Option cost = static spread − OAS. Higher rate vol → more valuable call → "
+        "higher option cost → lower OAS."
+    )
+    c = st.columns(3)
+    o_cpn = c[0].number_input("Coupon %", 0.0, 15.0, 5.00, 0.25)
+    o_mat = c[1].number_input("Maturity (years)", 1, 30, 5, 1)
+    o_px = c[2].number_input("Market price /100", 50.0, 160.0, 101.00, 0.25)
+    c2 = st.columns(3)
+    o_call = c2[0].number_input("Call price /100", 90.0, 115.0, 100.00, 0.5)
+    o_first = c2[1].number_input("First call (years)", 1, int(o_mat), min(3, int(o_mat)), 1)
+    o_vol = c2[2].slider("Rate volatility σ (%/yr)", 1, 40, 15, 1) / 100.0
+
+    res = oas_analysis(pillars, o_cpn, float(o_mat), o_px, o_vol, o_call, float(o_first))
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Static spread (Z)", f"{res['static_spread_bp']:.0f} bp")
+    k2.metric("OAS", f"{res['oas_bp']:.0f} bp")
+    k3.metric("Option cost", f"{res['option_cost_bp']:.0f} bp")
+
+    # Option cost vs volatility curve
+    vols = [v / 100.0 for v in range(2, 41, 2)]
+    oc = [oas_analysis(pillars, o_cpn, float(o_mat), o_px, v, o_call, float(o_first))
+          for v in vols]
+    oc_df = pd.DataFrame({
+        "Volatility %": [v * 100 for v in vols],
+        "OAS": [r["oas_bp"] for r in oc],
+        "Static spread": [r["static_spread_bp"] for r in oc],
+    })
+    oc_long = oc_df.melt("Volatility %", var_name="Measure", value_name="bp")
+    oc_chart = (
+        alt.Chart(oc_long)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("Volatility %:Q", title="Rate volatility σ (%/yr)"),
+            y=alt.Y("bp:Q", title="Spread (bp)"),
+            color=alt.Color("Measure:N", scale=alt.Scale(
+                domain=["Static spread", "OAS"], range=["#8b98a8", "#4f9dff"])),
+            tooltip=["Volatility %", "Measure", alt.Tooltip("bp:Q", format=".0f")],
+        )
+        .properties(height=320)
+    )
+    st.altair_chart(oc_chart, width="stretch")
+    st.caption(
+        "The gap between the two lines is the option cost. It widens with volatility "
+        "(the call is worth more to the issuer), so a callable bond's OAS is the spread "
+        "you actually earn after paying for the optionality."
+    )
+
+# --------------------------------------------------------------------------- #
+# TAB 7 — Early-warning monitoring
 # --------------------------------------------------------------------------- #
 with tab_ew:
     st.markdown("#### Spread-movement monitor")

@@ -29,7 +29,10 @@ Streamlit opens a multipage app:
 | **Spread decomposition** | yield = risk-free rate + credit premium, per bond and portfolio |
 | **Portfolio construction** | MV weights, **DTS** (duration × spread), risk budgeting |
 | **Active risk** | active duration / spread duration / DTS / yield vs. a benchmark |
+| **Curve risk** | **key-rate (partial) durations** per pillar — bullet/barbell and curve tilts |
+| **Tracking error** | **covariance/factor model** TE = √(wᵀΣw) with per-name risk contributions |
 | **Scenario analysis** | exact re-pricing under parallel rate shift Δr and spread widening Δs (+ duration/convexity approximation and a Δr×Δs heatmap) |
+| **OAS (callable)** | **option-adjusted spread** on a curve-calibrated binomial rate tree; option cost vs. volatility |
 | **Early warning** | spread-movement z-score monitor → OK / WATCH / ALERT |
 
 The risk-free base is a bootstrapped **NOK government curve**; the universe is an
@@ -39,9 +42,10 @@ illustrative **Nordic IG** set (NOK). Upload your own CSV to use real instrument
 
 - *Yield & spread measures* → YTM, Z-spread, G-spread
 - *Term structure* → bootstrapped zero/forward curve (Yield Curve page)
-- *Interest-rate risk* → modified duration, convexity, DV01, key risk numbers
+- *Interest-rate risk* → modified duration, convexity, DV01, **key-rate durations**
+- *Valuation of bonds with embedded options* → **OAS** via a binomial rate tree, option cost
 - *Credit analysis* → spread decomposition, spread duration, **DTS**
-- *Portfolio management* → benchmark-relative active risk and risk budgeting
+- *Portfolio management* → benchmark-relative active risk, risk budgeting, **tracking error**
 
 ## Project layout
 
@@ -53,7 +57,8 @@ illustrative **Nordic IG** set (NOK). Upload your own CSV to use real instrument
 │   └── 2_Credit_Portfolio.py       # IG credit model UI
 ├── fixed_income/
 │   ├── curve.py                    # bootstrap / discounting / par & forward rates
-│   ├── credit.py                   # YTM, spreads, durations, DTS, scenarios, alerts
+│   ├── credit.py                   # YTM, spreads, durations, KRD, DTS, scenarios, TE, alerts
+│   ├── oas.py                      # binomial rate tree + option-adjusted spread
 │   └── data_io.py                  # sample-data loaders + risk-free curve
 ├── data/
 │   ├── norwegian_govt_sample.csv   # risk-free curve instruments

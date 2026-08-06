@@ -28,6 +28,10 @@ An investment-grade credit model from the **investor's perspective**:
 - **Scenario analysis** — exact re-pricing under parallel rate shifts and spread widening
 - **Early warning** — spread-movement monitoring with z-score alerts
 
+### 📖 Læring & metodikk
+The finance behind every metric — intuition, formula, worked example, CFA Level II
+link and an interview-ready one-liner for each concept.
+
 ---
 *Sample data (Nordic IG names, NOK) is illustrative. Upload your own CSV on the Credit
 Portfolio page to use real instruments.*

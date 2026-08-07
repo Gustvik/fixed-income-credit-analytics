@@ -16,6 +16,8 @@ The list below is a direction of travel, not a schedule.
 | Active risk vs. benchmark; covariance tracking error | Fixed-Income Portfolio Management |
 | Option-adjusted spread on a binomial tree (callables) | Valuation of Bonds with Embedded Options |
 | Rate/spread scenario re-pricing; spread early-warning | Interest-Rate Risk / Credit Analysis |
+| Macro backdrop: policy rate, inflation, real vs. nominal rate, GDP (live Norges Bank + SSB) | Economics / Term Structure |
+| Learning page mapping each metric to CFA topics | — (study companion) |
 
 ## Planned
 

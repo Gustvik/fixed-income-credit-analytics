@@ -28,6 +28,10 @@ An investment-grade credit model from the **investor's perspective**:
 - **Scenario analysis** — exact re-pricing under parallel rate shifts and spread widening
 - **Early warning** — spread-movement monitoring with z-score alerts
 
+### 🌍 Makro
+The Norwegian macro backdrop — Norges Bank policy rate, inflation, real vs. nominal
+rate and mainland GDP growth. Live from Norges Bank & SSB (key-free).
+
 ### 📖 Læring & metodikk
 The finance behind every metric — intuition, formula, worked example, CFA Level II
 link and an interview-ready one-liner for each concept.

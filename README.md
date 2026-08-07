@@ -24,6 +24,9 @@ Streamlit opens a multipage app:
 - **📈 Yield Curve** — bootstrap a zero curve from coupon bonds → discount factors,
   par yields, forward rates. The risk-free foundation for credit spreads.
 - **📊 Credit Portfolio** — the IG credit model (below).
+- **🌍 Macro** — Norwegian policy rate, inflation, real vs. nominal rate and mainland
+  GDP growth, live from Norges Bank & SSB (no API key), with a bundled snapshot fallback.
+- **📖 Læring** — the finance behind every metric, mapped to CFA Level II topics.
 
 ## Credit Portfolio — what it does
 

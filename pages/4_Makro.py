@@ -70,9 +70,11 @@ rr_chart = (
 )
 st.altair_chart(zero + rr_chart, width="stretch")
 st.caption(
-    "Realrenten er styringsrenten minus 12-måneders KPI-inflasjon. Negativ realrente er "
-    "ekspansiv (stimulerer økonomien); positiv realrente er kontraktiv. Overgangen fra dypt "
-    "negativ til positiv realrente er den strammeste pengepolitiske innstrammingen i moderne tid."
+    "Realrenten er styringsrenten minus 12-måneders KPI-inflasjon. Det som avgjør om "
+    "pengepolitikken er ekspansiv eller kontraktiv, er ikke fortegnet, men om realrenten ligger "
+    "under eller over den **nøytrale realrenten (r\\*)** — nivået som verken stimulerer eller "
+    "bremser. Under r\\* gir gass, over r\\* bremser. En moderat positiv realrente er normalt og "
+    "sunt (sparere får realavkastning); det er en realrente godt *over* r\\* som strammer til."
 )
 
 col1, col2 = st.columns(2)

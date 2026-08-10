@@ -87,6 +87,23 @@ with tab1:
         "«Forwardkurven er markedets pris på fremtidige renter — den forteller om markedet "
         "venter kutt eller hevinger.»",
     )
+    concept(
+        "Realrente & nøytral realrente (r\\*)",
+        "Realrenten er nominell rente minus inflasjon. Men om pengepolitikken faktisk strammer "
+        "eller stimulerer, avgjøres ikke av fortegnet — det avgjøres av realrenten *relativt til "
+        "den nøytrale realrenten* r\\*, nivået som verken gir gass eller bremser. En moderat "
+        "positiv realrente er normalt og sunt; det er en realrente godt over r\\* som strammer til.",
+        [r"r \approx i - \pi \quad(\text{Fisher, approksimasjon})",
+         r"r < r^{*}\ \Rightarrow\ \text{ekspansiv},\qquad r > r^{*}\ \Rightarrow\ \text{kontraktiv}"],
+        [r"\text{Styringsrente } i = 4.0\%,\ \text{inflasjon } \pi = 3.2\%",
+         r"r = 4.0\% - 3.2\% = 0.8\%",
+         r"\text{Anta } r^{*}\approx 0.5\%:\quad 0.8\% > 0.5\%\ \Rightarrow\ \text{svakt kontraktiv}"],
+        "Makro-siden viser nominell styringsrente vs. realrente over tid — sweet spot er en "
+        "moderat positiv realrente nær r\\*.",
+        "*Economics* — nøytral rente, pengepolitisk innstilling og (beslektet) Taylor-regelen.",
+        "«Restriktiv pengepolitikk handler om realrenten relativt til r\\*, ikke om den er "
+        "positiv — det er nyansen mange bommer på.»",
+    )
 
 # ── 2 · Yield & spread ──────────────────────────────────────────────────────
 with tab2:
